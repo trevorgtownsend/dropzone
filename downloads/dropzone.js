@@ -431,6 +431,7 @@ require.register("dropzone/lib/dropzone.js", function(exports, require, module){
       thumbnailWidth: 100,
       thumbnailHeight: 100,
       params: {},
+      fileSelectLimit: null,
       clickable: true,
       acceptParameter: null,
       enqueueForUpload: true,
@@ -866,6 +867,14 @@ require.register("dropzone/lib/dropzone.js", function(exports, require, module){
     Dropzone.prototype.addFile = function(file) {
       var _this = this;
 
+      if (this.options.fileSelectLimit != null && this.files.length >= this.options.fileSelectLimit) {
+          if (this.options.enqueueForUpload == false) {
+              return _this.errorWithoutProcessing(file, "Attempted to exceed file select limit of " + this.options.fileSelectLimit);
+          } else {
+              return _this.errorProcessing(file, "Attempted to exceed file select limit of " + this.options.fileSelectLimit);
+          }
+      }
+
       this.files.push(file);
       this.emit("addedfile", file);
       if (this.options.createImageThumbnails && file.type.match(/image.*/) && file.size <= this.options.maxThumbnailFilesize * 1024 * 1024) {
@@ -907,6 +916,38 @@ require.register("dropzone/lib/dropzone.js", function(exports, require, module){
       }
       return null;
     };
+
+    Dropzone.prototype.removeAllFilesExceptLast = function () {
+        var file, _i, _len, _ref;
+
+        _ref = this.files.slice();
+        for (_i = 0, _len = _ref.length - 1; _i < _len; _i++) {
+            file = _ref[_i];
+            if (__indexOf.call(this.filesProcessing, file) < 0) {
+                this.removeFile(file);
+            }
+        }
+        return null;
+    };
+
+    Dropzone.prototype.removeAllNonCompliantFiles = function () {
+        var file, _i, _len, _ref, _ap, _mimeTypes;
+
+        _ref = this.files.slice();
+        _ap = this.options.acceptParameter.replace(/\s+/g, '');
+        _mimeTypes = _ap.split(',');
+
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            file = _ref[_i];
+            if (__indexOf.call(this.filesProcessing, file) < 0) {
+                if (__indexOf.call(_mimeTypes, file.type) < 0) {
+                    this.removeFile(file);
+                }
+            }
+        }
+        return null;
+    };
+
 
     Dropzone.prototype.createThumbnail = function(file) {
       var fileReader,
@@ -1054,6 +1095,10 @@ require.register("dropzone/lib/dropzone.js", function(exports, require, module){
       this.processQueue();
       this.emit("error", file, message);
       return this.emit("complete", file);
+    };
+
+    Dropzone.prototype.errorWithoutProcessing = function (file, message) {
+        return this.emit("error", file, message);       
     };
 
     return Dropzone;
